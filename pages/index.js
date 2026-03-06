@@ -3,7 +3,164 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine, Legend
 } from "recharts";
+function PredictionTab() {
+  const [pred, setPred]       = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [channel, setChannel] = useState("chat");
 
+  useEffect(function() {
+    fetch("/api/prediction").then(function(r){ return r.json(); }).then(function(d){
+      setPred(d);
+      setLoading(false);
+    });
+  }, []);
+
+  if (loading) return (
+    <div style={{ color:"#2a3544", fontFamily:"Space Mono,monospace", fontSize:12, padding:32 }}>
+      CALCULATING FULL DAY PREDICTION...
+    </div>
+  );
+
+  const CHANNELS = [
+    { key:"chat",  label:"CHAT",  color:"#00d4ff", slaLabel:"IRT 3MIN", target:0.80 },
+    { key:"email", label:"EMAIL", color:"#7c3aed", slaLabel:"RT 2HR",   target:0.80 },
+    { key:"phone", label:"PHONE", color:"#00ff88", slaLabel:"SLA",      target:0.95 },
+  ];
+
+  const pct = function(v){ return v > 0 ? (v*100).toFixed(0)+"%" : "—"; };
+  const summary = pred && pred.summary ? pred.summary : {};
+  const rows    = pred && pred[channel] ? pred[channel] : [];
+  const chConf  = CHANNELS.find(function(c){ return c.key === channel; });
+  const chSum   = summary[channel] || {};
+
+  const trendColor = chSum.trend === "improving" ? "#00ff88" : chSum.trend === "declining" ? "#ff4444" : "#fbbf24";
+  const trendIcon  = chSum.trend === "improving" ? "↑" : chSum.trend === "declining" ? "↓" : "→";
+
+  return (
+    <div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:16, marginBottom:24 }}>
+        {CHANNELS.map(function(ch) {
+          const s = summary[ch.key] || {};
+          const col = s.daySLA >= ch.target ? "#00ff88" : "#ff4444";
+          return (
+            <div key={ch.key} style={{ background:"#0d1117", border:"1px solid #1e2733", borderTop:"2px solid "+ch.color, padding:20 }}>
+              <div style={{ fontFamily:"Space Mono,monospace", fontSize:10, color:"#64748b", letterSpacing:"0.15em", marginBottom:8 }}>{ch.label} — FULL DAY {ch.slaLabel}</div>
+              <div style={{ fontSize:40, fontWeight:800, color:col, fontFamily:"Syne,sans-serif", lineHeight:1, marginBottom:8 }}>
+                {pct(s.daySLA)}
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
+                {[
+                  ["ACTUAL",    pct(s.actualSLA),    "#94a3b8"],
+                  ["PREDICTED", pct(s.predictedSLA), ch.color],
+                  ["CRITICAL",  s.criticalHours+"hrs", s.criticalHours>0?"#ff4444":"#00ff88"],
+                ].map(function(item){
+                  return (
+                    <div key={item[0]} style={{ background:"#080c10", padding:"6px 8px" }}>
+                      <div style={{ fontSize:8, color:"#64748b", fontFamily:"Space Mono,monospace", letterSpacing:"0.1em" }}>{item[0]}</div>
+                      <div style={{ fontSize:14, fontWeight:700, color:item[2], fontFamily:"Syne,sans-serif" }}>{item[1]}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ background:"#0d1117", border:"1px solid #1e2733", padding:20 }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <div style={{ width:3, height:18, background:chConf.color, borderRadius:2 }} />
+            <span style={{ fontSize:12, fontWeight:700, letterSpacing:"0.12em", color:"#94a3b8", fontFamily:"Space Mono,monospace" }}>
+              HOURLY BREAKDOWN — ACTUAL + PREDICTED
+            </span>
+          </div>
+          <div style={{ display:"flex", gap:8 }}>
+            {CHANNELS.map(function(ch){
+              return (
+                <button key={ch.key} onClick={function(){ setChannel(ch.key); }} style={{
+                  background: channel===ch.key ? ch.color+"22" : "transparent",
+                  border:"1px solid "+(channel===ch.key ? ch.color : "#2a3544"),
+                  color: channel===ch.key ? ch.color : "#64748b",
+                  padding:"4px 12px", fontFamily:"Space Mono,monospace",
+                  fontSize:10, cursor:"pointer",
+                }}>{ch.label}</button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{ display:"flex", gap:16, marginBottom:16 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+            <div style={{ width:12, height:3, background:chConf.color, borderRadius:2 }} />
+            <span style={{ fontFamily:"Space Mono,monospace", fontSize:10, color:"#64748b" }}>ACTUAL</span>
+          </div>
+          <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+            <div style={{ width:12, height:3, background:chConf.color, borderRadius:2, opacity:0.4, borderTop:"1px dashed "+chConf.color }} />
+            <span style={{ fontFamily:"Space Mono,monospace", fontSize:10, color:"#64748b" }}>PREDICTED</span>
+          </div>
+          <div style={{ marginLeft:"auto", fontFamily:"Space Mono,monospace", fontSize:11, color:trendColor }}>
+            TREND {trendIcon} {chSum.trend ? chSum.trend.toUpperCase() : ""}
+          </div>
+        </div>
+
+        <table style={{ width:"100%", borderCollapse:"collapse", fontFamily:"Space Mono,monospace", fontSize:11 }}>
+          <thead>
+            <tr style={{ background:"#080c10" }}>
+              {["TIME","TYPE","SLA","VOLUME","FTE","CONFIDENCE","STATUS"].map(function(h){
+                return <th key={h} style={{ padding:"10px 12px", textAlign:"left", color:"#64748b", fontSize:9, letterSpacing:"0.1em", borderBottom:"1px solid #1e2733" }}>{h}</th>;
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(function(row, i){
+              const isGood = row.sla >= chConf.target;
+              const slaCol = row.sla === 0 ? "#2a3544" : isGood ? "#00ff88" : row.sla >= 0.70 ? "#fbbf24" : "#ff4444";
+              return (
+                <tr key={i} style={{
+                  borderBottom:"1px solid rgba(30,39,51,0.5)",
+                  background: row.predicted ? "rgba(0,212,255,0.02)" : "transparent",
+                  opacity: row.vol === 0 && row.sla === 0 ? 0.3 : 1,
+                }}>
+                  <td style={{ padding:"9px 12px", color:chConf.color, fontWeight:700 }}>{row.time}</td>
+                  <td style={{ padding:"9px 12px" }}>
+                    {row.predicted ? (
+                      <span style={{ color:"#00d4ff", background:"rgba(0,212,255,0.08)", padding:"2px 8px", fontSize:9, letterSpacing:"0.1em" }}>🔮 PREDICTED</span>
+                    ) : (
+                      <span style={{ color:"#00ff88", background:"rgba(0,255,136,0.08)", padding:"2px 8px", fontSize:9, letterSpacing:"0.1em" }}>✓ ACTUAL</span>
+                    )}
+                  </td>
+                  <td style={{ padding:"9px 12px" }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                      <div style={{ width:40, height:3, background:"#1e2733", borderRadius:2 }}>
+                        <div style={{ width:(row.sla*100)+"%", height:"100%", background:slaCol, borderRadius:2, opacity: row.predicted ? 0.7 : 1 }} />
+                      </div>
+                      <span style={{ color:slaCol, fontWeight:700 }}>{pct(row.sla)}</span>
+                    </div>
+                  </td>
+                  <td style={{ padding:"9px 12px", color:"#e2e8f0" }}>{row.vol || "—"}</td>
+                  <td style={{ padding:"9px 12px", color:"#e2e8f0" }}>{row.fte || "—"}</td>
+                  <td style={{ padding:"9px 12px", color:"#64748b" }}>
+                    {row.predicted ? (row.confidence*100).toFixed(0)+"%" : "100%"}
+                  </td>
+                  <td style={{ padding:"9px 12px" }}>
+                    {row.vol === 0 && row.sla === 0 ? (
+                      <span style={{ color:"#2a3544", fontSize:10 }}>NO ACTIVITY</span>
+                    ) : isGood ? (
+                      <span style={{ color:"#00ff88", fontSize:10 }}>✅ ON TARGET</span>
+                    ) : (
+                      <span style={{ color:"#ff4444", fontSize:10 }}>⚠ BELOW TARGET</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 const pct = (v) => v > 0 ? (v * 100).toFixed(0) + "%" : "—";
 const num = (v) => typeof v === "number" ? v.toFixed(1) : "—";
 
@@ -184,7 +341,7 @@ export default function Dashboard() {
             </div>
 
             <div style={{ display:"flex", gap:2, marginBottom:20, borderBottom:"1px solid #1e2733" }}>
-              {[["overview","📊 OVERVIEW"],["detail","🔍 HOURLY DETAIL"],["charts","📈 CHARTS"],["insights","🤖 AI INSIGHTS"],["status","🖥 STATUS"]].map(function(item) {
+            {[["overview","📊 OVERVIEW"],["detail","🔍 HOURLY DETAIL"],["charts","📈 CHARTS"],["predict","📅 FULL DAY"],["insights","🤖 AI INSIGHTS"],["status","🖥 STATUS"]].map(function(item) {
                 return (
                   <button key={item[0]} onClick={function(){setTab(item[0]);}} style={{
                     background: tab===item[0] ? "#0d1117" : "transparent", border:"none",
@@ -375,7 +532,9 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
-
+{tab === "predict" && (
+  <PredictionTab />
+)}
             {tab === "insights" && (
               <div style={{ display:"grid", gap:16 }}>
                 <SectionHeader title="AI INSIGHTS — GEMINI MULTI-CHANNEL ANALYSIS" accent="#7c3aed" />
