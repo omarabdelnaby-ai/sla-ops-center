@@ -485,11 +485,12 @@ function ActionCard({ icon, title, desc, onClick, loading, color }) {
   return (
     <button onClick={onClick} disabled={loading} style={{ ...styles.actionCard, borderColor: loading ? color : 'var(--border-subtle)' }}>
       <span style={{ fontSize: '1.8rem' }}>{loading ? '⏳' : icon}</span>
-      <strong style={{ color: 'var(--text-primary)', fontSize: '0.95rem' }}>{title}</strong>
-      <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{desc}</span>
+      <strong style={{ color: '#ffffff', fontSize: '0.95rem' }}>{title}</strong>
+      <span style={{ color: '#8b98a8', fontSize: '0.8rem' }}>{desc}</span>
     </button>
   );
 }
+```
 
 function SysItem({ label, value }) {
   return (
