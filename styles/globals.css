@@ -57,3 +57,4 @@ body::before {
 
 .animate-in { animation: fadeIn 0.4s ease forwards; }
 .pulse       { animation: pulse 2s infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
