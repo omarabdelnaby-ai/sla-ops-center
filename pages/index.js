@@ -470,7 +470,7 @@ function ActionsTab({ data }) {
       <div style={styles.systemInfo}>
         <h3 style={styles.chartTitle}>System Info</h3>
         <div style={styles.sysGrid}>
-          <SysItem label="Prediction Engine" value="v2 — Client-Side" />
+          <SysItem label="Prediction Engine" value="v3 — Erlang C Engine" />
           <SysItem label="Data Source" value="Google Sheets via Apps Script" />
           <SysItem label="Refresh Interval" value="60 seconds" />
           <SysItem label="Channels" value="Chat, Email, Phone" />
